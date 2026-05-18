@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model ProductCategory {
+  id        String            @id @default(cuid())
+  name      String
+  desc      String?
+  products  Product[]
+  machines  MachineCategory[]
+  createdAt DateTime          @default(now())
+}
+
+model Product {
+  id         String          @id @default(cuid())
+  name       String
+  categoryId String
+  category   ProductCategory @relation(fields: [categoryId], references: [id])
+  formulas   Formula[]
+  orders     Order[]
+  createdAt  DateTime        @default(now())
+}
+
+model Pattern {
+  id       String           @id @default(cuid())
+  name     String
+  desc     String?
+  machines MachinePattern[]
+}
+
+model Machine {
+  id         String            @id @default(cuid())
+  name       String
+  isActive   Boolean           @default(true)
+  minWidth   Float
+  maxWidth   Float
+  notes      String?
+  categories MachineCategory[]
+  patterns   MachinePattern[]
+  tasks      ProductionTask[]
+  createdAt  DateTime          @default(now())
+}
+
+model MachineCategory {
+  machineId  String
+  categoryId String
+  machine    Machine         @relation(fields: [machineId], references: [id])
+  category   ProductCategory @relation(fields: [categoryId], references: [id])
+
+  @@id([machineId, categoryId])
+}
+
+model MachinePattern {
+  machineId String
+  patternId String
+  machine   Machine @relation(fields: [machineId], references: [id])
+  pattern   Pattern @relation(fields: [patternId], references: [id])
+
+  @@id([machineId, patternId])
+}
+
+model Formula {
+  id         String   @id @default(cuid())
+  name       String
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  specParams String
+  materials  String
+  sourceId   String?
+  source     Formula?  @relation("FormulaSource", fields: [sourceId], references: [id])
+  derived    Formula[] @relation("FormulaSource")
+  notes      String?
+  orders     Order[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  company   String
+  contact   String
+  notes     String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id              String          @id @default(cuid())
+  orderNo         String          @unique
+  customerId      String
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  productId       String
+  product         Product         @relation(fields: [productId], references: [id])
+  specParams      String
+  quantity        Float
+  unit            String
+  formulaId       String?
+  formula         Formula?        @relation(fields: [formulaId], references: [id])
+  formulaSnapshot String?
+  extraNotes      String?
+  status          OrderStatus     @default(PENDING)
+  taskId          String?
+  task            ProductionTask? @relation(fields: [taskId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  PRODUCING
+  DONE
+}
+
+model ProductionTask {
+  id        String     @id @default(cuid())
+  machineId String
+  machine   Machine    @relation(fields: [machineId], references: [id])
+  position  Int
+  status    TaskStatus @default(WAITING)
+  notes     String?
+  orders    Order[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+enum TaskStatus {
+  WAITING
+  PRODUCING
+  DONE
+}
