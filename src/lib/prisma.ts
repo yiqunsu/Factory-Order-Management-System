@@ -1,7 +1,12 @@
 import { PrismaClient } from "@/generated/prisma/client"
 import { PrismaMariaDb } from "@prisma/adapter-mariadb"
 
-function createPrismaClient() {
+declare global {
+  // eslint-disable-next-line no-var
+  var prisma: PrismaClient | undefined
+}
+
+function createPrismaClient(): PrismaClient {
   const url = new URL(process.env.DATABASE_URL!)
   const adapter = new PrismaMariaDb({
     host: url.hostname,
@@ -13,8 +18,17 @@ function createPrismaClient() {
   return new PrismaClient({ adapter })
 }
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
+function getClient(): PrismaClient {
+  if (!global.prisma) {
+    global.prisma = createPrismaClient()
+  }
+  return global.prisma
+}
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+// Proxy 保证模块被 import 时不立即执行 createPrismaClient()
+// 只有真正调用 prisma.xxx 时才初始化，避免 next build 阶段 DATABASE_URL 未注入导致崩溃
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_, prop: string | symbol) {
+    return Reflect.get(getClient(), prop)
+  },
+})
