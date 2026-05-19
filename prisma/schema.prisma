@@ -4,13 +4,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
 }
 
 model ProductCategory {
   id        String            @id @default(cuid())
   name      String
-  desc      String?
+  desc      String?           @db.Text
   products  Product[]
   machines  MachineCategory[]
   createdAt DateTime          @default(now())
@@ -29,7 +29,7 @@ model Product {
 model Pattern {
   id       String           @id @default(cuid())
   name     String
-  desc     String?
+  desc     String?          @db.Text
   machines MachinePattern[]
 }
 
@@ -39,7 +39,7 @@ model Machine {
   isActive   Boolean           @default(true)
   minWidth   Float
   maxWidth   Float
-  notes      String?
+  notes      String?           @db.Text
   categories MachineCategory[]
   patterns   MachinePattern[]
   tasks      ProductionTask[]
@@ -65,16 +65,16 @@ model MachinePattern {
 }
 
 model Formula {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   name       String
   productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  specParams String
-  materials  String
+  product    Product   @relation(fields: [productId], references: [id])
+  specParams String    @db.Text
+  materials  String    @db.Text
   sourceId   String?
   source     Formula?  @relation("FormulaSource", fields: [sourceId], references: [id])
   derived    Formula[] @relation("FormulaSource")
-  notes      String?
+  notes      String?   @db.Text
   orders     Order[]
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -84,7 +84,7 @@ model Customer {
   id        String   @id @default(cuid())
   company   String
   contact   String
-  notes     String?
+  notes     String?  @db.Text
   orders    Order[]
   createdAt DateTime @default(now())
 }
@@ -96,13 +96,13 @@ model Order {
   customer        Customer        @relation(fields: [customerId], references: [id])
   productId       String
   product         Product         @relation(fields: [productId], references: [id])
-  specParams      String
+  specParams      String          @db.Text
   quantity        Float
   unit            String
   formulaId       String?
   formula         Formula?        @relation(fields: [formulaId], references: [id])
-  formulaSnapshot String?
-  extraNotes      String?
+  formulaSnapshot String?         @db.Text
+  extraNotes      String?         @db.Text
   status          OrderStatus     @default(PENDING)
   taskId          String?
   task            ProductionTask? @relation(fields: [taskId], references: [id])
@@ -122,7 +122,7 @@ model ProductionTask {
   machine   Machine    @relation(fields: [machineId], references: [id])
   position  Int
   status    TaskStatus @default(WAITING)
-  notes     String?
+  notes     String?    @db.Text
   orders    Order[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt

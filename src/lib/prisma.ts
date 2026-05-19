@@ -1,10 +1,15 @@
 import { PrismaClient } from "@/generated/prisma/client"
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3"
-import path from "path"
+import { PrismaMariaDb } from "@prisma/adapter-mariadb"
 
 function createPrismaClient() {
-  const dbPath = path.resolve(process.cwd(), "dev.db")
-  const adapter = new PrismaBetterSqlite3({ url: dbPath })
+  const url = new URL(process.env.DATABASE_URL!)
+  const adapter = new PrismaMariaDb({
+    host: url.hostname,
+    port: Number(url.port),
+    user: url.username,
+    password: decodeURIComponent(url.password),
+    database: url.pathname.slice(1),
+  })
   return new PrismaClient({ adapter })
 }
 
