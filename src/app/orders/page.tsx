@@ -12,8 +12,8 @@ type OrderStatus = "PENDING" | "PRODUCING" | "DONE";
 
 interface Category { id: string; name: string }
 interface Product  { id: string; name: string; category: Category }
-interface Customer { id: string; company: string }
-interface Formula  { id: string; name: string }
+interface Customer { id: string; company: string; contact: string }
+interface Formula  { id: string; name: string; materials: string }
 
 interface Order {
   id:         string;
@@ -26,6 +26,11 @@ interface Order {
   formula:    Formula | null;
   status:     OrderStatus;
   createdAt:  string;
+}
+
+interface FullOrder extends Order {
+  formulaSnapshot: string | null;
+  extraNotes:      string | null;
 }
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -53,6 +58,26 @@ const FILTER_TABS: { key: OrderStatus | "ALL"; label: string }[] = [
   { key: "DONE",      label: "已完成" },
 ];
 
+function specBadges(json: string) {
+  try { return Object.entries(JSON.parse(json) as Record<string, string>); }
+  catch { return []; }
+}
+
+function getMaterials(order: FullOrder): string | null {
+  if (order.formulaSnapshot) {
+    try {
+      const snap = JSON.parse(order.formulaSnapshot) as { materials?: string };
+      if (snap.materials?.trim()) return snap.materials.trim();
+    } catch { /* fall through */ }
+  }
+  if (order.formula?.materials?.trim()) return order.formula.materials.trim();
+  return null;
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
 /* ─── Main ─── */
 export default function OrdersPage() {
   const router = useRouter();
@@ -60,6 +85,14 @@ export default function OrdersPage() {
   const [loading,      setLoading]      = useState(true);
   const [filter,       setFilter]       = useState<OrderStatus | "ALL">("ALL");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [detailOrder,  setDetailOrder]  = useState<FullOrder | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  /* ── Extra filters ── */
+  const [filterCustomer, setFilterCustomer] = useState("");
+  const [filterProduct,  setFilterProduct]  = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo,   setFilterDateTo]   = useState("");
 
   async function load() {
     setLoading(true);
@@ -69,6 +102,14 @@ export default function OrdersPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  async function openDetail(order: Order) {
+    setDetailLoading(true);
+    setDetailOrder(null);
+    const data = await fetch(`/api/orders/${order.id}`).then((r) => r.json());
+    setDetailOrder(data as FullOrder);
+    setDetailLoading(false);
+  }
 
   async function cycleStatus(order: Order, e: React.MouseEvent) {
     e.stopPropagation();
@@ -88,7 +129,36 @@ export default function OrdersPage() {
     setOrders((prev) => prev.filter((o) => o.id !== deleteTarget.id));
   }
 
-  const displayed = filter === "ALL" ? orders : orders.filter((o) => o.status === filter);
+  /* ── Derived filter options ── */
+  const uniqueCustomers = Array.from(
+    new Map(orders.map((o) => [o.customer.id, o.customer])).values()
+  ).sort((a, b) => a.company.localeCompare(b.company));
+
+  const uniqueProducts = Array.from(
+    new Map(orders.map((o) => [o.product.id, o.product])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  const hasExtraFilter = filterCustomer || filterProduct || filterDateFrom || filterDateTo;
+
+  function clearExtraFilters() {
+    setFilterCustomer(""); setFilterProduct("");
+    setFilterDateFrom(""); setFilterDateTo("");
+  }
+
+  const displayed = orders.filter((o) => {
+    if (filter !== "ALL" && o.status !== filter) return false;
+    if (filterCustomer && o.customer.id !== filterCustomer) return false;
+    if (filterProduct  && o.product.id  !== filterProduct)  return false;
+    if (filterDateFrom) {
+      const created = o.createdAt.slice(0, 10);
+      if (created < filterDateFrom) return false;
+    }
+    if (filterDateTo) {
+      const created = o.createdAt.slice(0, 10);
+      if (created > filterDateTo) return false;
+    }
+    return true;
+  });
 
   const counts: Record<OrderStatus | "ALL", number> = {
     ALL:       orders.length,
@@ -143,6 +213,50 @@ export default function OrdersPage() {
         </div>
       </header>
 
+      {/* Filter bar */}
+      <div className="bg-white border-b border-slate-100 px-8 py-2.5 flex items-center gap-3 flex-wrap">
+        <select
+          value={filterCustomer}
+          onChange={(e) => setFilterCustomer(e.target.value)}
+          className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        >
+          <option value="">全部客户</option>
+          {uniqueCustomers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+        </select>
+        <select
+          value={filterProduct}
+          onChange={(e) => setFilterProduct(e.target.value)}
+          className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        >
+          <option value="">全部产品</option>
+          {uniqueProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 shrink-0">日期</span>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          <span className="text-xs text-slate-300">—</span>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+        </div>
+        {hasExtraFilter && (
+          <button
+            onClick={clearExtraFilters}
+            className="h-8 px-2.5 rounded-md text-xs text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 transition-colors"
+          >
+            清除筛选
+          </button>
+        )}
+      </div>
+
       <main className="flex-1 px-8 py-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {loading ? (
@@ -181,7 +295,7 @@ export default function OrdersPage() {
                     return (
                       <tr
                         key={order.id}
-                        onClick={() => router.push(`/orders/${order.id}`)}
+                        onClick={() => openDetail(order)}
                         className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
                       >
                         {/* 订单号 */}
@@ -275,6 +389,81 @@ export default function OrdersPage() {
         </div>
       </main>
 
+      {/* 订单详情 */}
+      <Dialog open={detailLoading || detailOrder !== null} onOpenChange={(o) => { if (!o) { setDetailOrder(null); setDetailLoading(false); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {detailOrder && (
+                <>
+                  <span className="font-mono text-sm font-semibold text-slate-700">{detailOrder.orderNo}</span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${STATUS_STYLE[detailOrder.status]}`}>
+                    {STATUS_LABEL[detailOrder.status]}
+                  </span>
+                </>
+              )}
+              {detailLoading && <span className="text-sm text-slate-400">加载中…</span>}
+            </DialogTitle>
+          </DialogHeader>
+          {detailLoading || !detailOrder ? (
+            <div className="py-10 flex items-center justify-center">
+              <p className="text-sm text-slate-400">加载中…</p>
+            </div>
+          ) : (
+            <div className="space-y-5 pt-1">
+              <section>
+                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">基本信息</h4>
+                <div className="space-y-1.5">
+                  <DetailRow label="客户" value={detailOrder.customer.company} />
+                  <DetailRow label="联系人" value={detailOrder.customer.contact} />
+                  <DetailRow label="产品" value={`${detailOrder.product.category.name} · ${detailOrder.product.name}`} />
+                  <DetailRow label="数量" value={`${detailOrder.quantity} ${detailOrder.unit}`} />
+                  <DetailRow label="创建日期" value={fmtDate(detailOrder.createdAt)} />
+                </div>
+              </section>
+              {specBadges(detailOrder.specParams).length > 0 && (
+                <section>
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">规格参数</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {specBadges(detailOrder.specParams).map(([k, v]) => (
+                      <span key={k} className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-medium">{k}: {v}</span>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {(detailOrder.formula || detailOrder.formulaSnapshot) && (() => {
+                const materials = getMaterials(detailOrder);
+                return (
+                  <section>
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">配方</h4>
+                    {detailOrder.formula && <p className="text-sm text-slate-700 font-semibold mb-2">{detailOrder.formula.name}</p>}
+                    {materials ? (
+                      <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-200 font-sans">{materials}</pre>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">暂无原材料明细</p>
+                    )}
+                  </section>
+                );
+              })()}
+              {detailOrder.extraNotes && (
+                <section>
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">额外要求</h4>
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg px-3 py-2">{detailOrder.extraNotes}</p>
+                </section>
+              )}
+              <div className="flex justify-end pt-1">
+                <Button
+                  onClick={() => { setDetailOrder(null); router.push(`/orders/${detailOrder.id}`); }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                >
+                  编辑订单
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* 删除确认 */}
       <Dialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-sm">
@@ -289,5 +478,14 @@ export default function OrdersPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-2 text-sm">
+      <span className="text-slate-400 shrink-0 w-16">{label}</span>
+      <span className="text-slate-700">{value}</span>
+    </div>
   );
 }

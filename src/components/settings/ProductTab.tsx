@@ -186,12 +186,18 @@ function ProductSection({
   const [selected, setSelected]             = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting]     = useState(false);
+  const [filterCategoryId, setFilterCategoryId] = useState("");
 
-  const allChecked = products.length > 0 && selected.size === products.length;
-  const indeterminate = selected.size > 0 && selected.size < products.length;
+  const filtered = filterCategoryId ? products.filter((p) => p.categoryId === filterCategoryId) : products;
+  const allChecked = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
+  const indeterminate = filtered.some((p) => selected.has(p.id)) && !allChecked;
 
   function toggleAll() {
-    setSelected(allChecked ? new Set() : new Set(products.map((p) => p.id)));
+    if (allChecked) {
+      setSelected((prev) => { const next = new Set(prev); filtered.forEach((p) => next.delete(p.id)); return next; });
+    } else {
+      setSelected((prev) => new Set([...prev, ...filtered.map((p) => p.id)]));
+    }
   }
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -243,12 +249,22 @@ function ProductSection({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-800">产品</h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            共 <span className="text-blue-600 font-semibold">{products.length}</span> 个产品
-          </p>
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-1 flex-wrap">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">产品</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              显示 <span className="text-blue-600 font-semibold">{filtered.length}</span> / {products.length} 个产品
+            </p>
+          </div>
+          <select
+            value={filterCategoryId}
+            onChange={(e) => setFilterCategoryId(e.target.value)}
+            className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          >
+            <option value="">全部大类</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </div>
         <div className="flex items-center gap-2">
           {selected.size > 0 && (
@@ -275,9 +291,11 @@ function ProductSection({
         </div>
       </div>
 
-      {products.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="px-6 py-10 text-center">
-          <p className="text-slate-400 text-sm">{categories.length === 0 ? "请先添加产品大类" : "暂无产品"}</p>
+          <p className="text-slate-400 text-sm">
+            {categories.length === 0 ? "请先添加产品大类" : filterCategoryId ? "该大类下暂无产品" : "暂无产品"}
+          </p>
         </div>
       ) : (
         <>
@@ -300,7 +318,7 @@ function ProductSection({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {products.map((p) => (
+              {filtered.map((p) => (
                 <tr key={p.id} className={`transition-colors group ${selected.has(p.id) ? "bg-blue-50/60" : "hover:bg-blue-50/30"}`}>
                   <td className="px-4 py-4">
                     <input
@@ -339,7 +357,7 @@ function ProductSection({
             </tbody>
           </table>
           <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs text-slate-400">显示全部 {products.length} 个产品</span>
+            <span className="text-xs text-slate-400">显示 {filtered.length} / {products.length} 个产品</span>
             {selected.size > 0 && (
               <span className="text-xs text-blue-600 font-medium">已选 {selected.size} 项</span>
             )}

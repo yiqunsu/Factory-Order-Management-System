@@ -128,6 +128,28 @@ export default function FormulaTab() {
   const [viewingNotes, setViewingNotes]         = useState<string | null>(null);
   const [viewingMaterials, setViewingMaterials] = useState<string | null>(null);
 
+  /* ── Filters ── */
+  const [filterCategoryId, setFilterCategoryId] = useState("");
+  const [filterProductId,  setFilterProductId]  = useState("");
+
+  const categories = Array.from(new Map(products.map((p) => [p.category.id, p.category])).values())
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const productsInCategory = filterCategoryId
+    ? products.filter((p) => p.category.id === filterCategoryId)
+    : products;
+
+  const filteredFormulas = formulas.filter((f) => {
+    if (filterCategoryId && f.product.category.id !== filterCategoryId) return false;
+    if (filterProductId  && f.productId !== filterProductId)            return false;
+    return true;
+  });
+
+  function handleCategoryChange(catId: string) {
+    setFilterCategoryId(catId);
+    setFilterProductId(""); // reset product when category changes
+  }
+
   async function load() {
     setLoading(true);
     const [f, p] = await Promise.all([
@@ -194,13 +216,35 @@ export default function FormulaTab() {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-800">配方库</h2>
-          {!loading && (
-            <p className="text-sm text-slate-500 mt-0.5">
-              共 <span className="text-blue-600 font-semibold">{formulas.length}</span> 个配方
-            </p>
+      <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-1 flex-wrap">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">配方库</h2>
+            {!loading && (
+              <p className="text-sm text-slate-500 mt-0.5">
+                显示 <span className="text-blue-600 font-semibold">{filteredFormulas.length}</span> / {formulas.length} 个配方
+              </p>
+            )}
+          </div>
+          {!loading && products.length > 0 && (
+            <>
+              <select
+                value={filterCategoryId}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option value="">全部大类</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <select
+                value={filterProductId}
+                onChange={(e) => setFilterProductId(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option value="">全部产品</option>
+                {productsInCategory.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </>
           )}
         </div>
         <button
@@ -218,12 +262,16 @@ export default function FormulaTab() {
       {/* Table */}
       {loading ? (
         <div className="px-6 py-16 text-center text-sm text-slate-400">加载中…</div>
-      ) : formulas.length === 0 ? (
+      ) : filteredFormulas.length === 0 ? (
         <div className="px-6 py-16 text-center">
           <p className="text-slate-400 text-sm">
-            {products.length === 0 ? "请先在「产品」Tab 中添加产品" : "暂无配方"}
+            {products.length === 0
+              ? "请先在「产品」Tab 中添加产品"
+              : filterCategoryId || filterProductId
+                ? "当前筛选条件下暂无配方"
+                : "暂无配方"}
           </p>
-          {products.length > 0 && (
+          {products.length > 0 && !filterCategoryId && !filterProductId && (
             <button onClick={openCreate} className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
               + 新增第一个配方
             </button>
@@ -248,7 +296,7 @@ export default function FormulaTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {formulas.map((f) => {
+              {filteredFormulas.map((f) => {
                 let specObj: Record<string, string> = {};
                 try { specObj = JSON.parse(f.specParams); } catch { /* empty */ }
                 const specEntries = Object.entries(specObj);
@@ -340,7 +388,7 @@ export default function FormulaTab() {
             </tbody>
           </table>
           <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100">
-            <span className="text-xs text-slate-400">显示全部 {formulas.length} 个配方</span>
+            <span className="text-xs text-slate-400">显示 {filteredFormulas.length} / {formulas.length} 个配方</span>
           </div>
         </>
       )}

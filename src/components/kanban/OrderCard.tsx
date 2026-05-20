@@ -104,20 +104,15 @@ export default function OrderCard({ order, overlay = false }: Props) {
     });
   }
 
-  function getMaterials(): Array<Record<string, string>> {
-    // Try formulaSnapshot first (historical copy saved at order creation)
+  function getMaterials(): string | null {
     if (fullOrder?.formulaSnapshot) {
       try {
         const snap = JSON.parse(fullOrder.formulaSnapshot) as { materials?: string };
-        if (snap.materials) return JSON.parse(snap.materials) as Array<Record<string, string>>;
+        if (snap.materials?.trim()) return snap.materials.trim();
       } catch { /* fall through */ }
     }
-    // Fallback: live formula record
-    if (fullOrder?.formula?.materials) {
-      try { return JSON.parse(fullOrder.formula.materials) as Array<Record<string, string>>; }
-      catch { /* fall through */ }
-    }
-    return [];
+    if (fullOrder?.formula?.materials?.trim()) return fullOrder.formula.materials.trim();
+    return null;
   }
 
   return (
@@ -237,26 +232,10 @@ export default function OrderCard({ order, overlay = false }: Props) {
                     {fullOrder.formula && (
                       <p className="text-sm text-slate-700 font-semibold mb-2">{fullOrder.formula.name}</p>
                     )}
-                    {materials.length > 0 ? (
-                      <div className="rounded-lg border border-slate-200 overflow-hidden">
-                        <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                          <span>原料</span>
-                          <span>比例</span>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {materials.map((mat, i) => {
-                            const keys = Object.keys(mat);
-                            const nameKey  = keys.find((k) => k.includes("原料") || k.includes("材料") || k === "name") ?? keys[0];
-                            const ratioKey = keys.find((k) => k.includes("比例") || k.includes("ratio")) ?? keys[1];
-                            return (
-                              <div key={i} className="flex items-center justify-between px-3 py-2 text-xs">
-                                <span className="text-slate-700">{mat[nameKey]}</span>
-                                <span className="text-slate-500 font-medium tabular-nums">{mat[ratioKey]}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                    {materials ? (
+                      <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-200 font-sans">
+                        {materials}
+                      </pre>
                     ) : (
                       <p className="text-xs text-slate-400 italic">暂无原材料明细</p>
                     )}
