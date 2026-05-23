@@ -9,6 +9,8 @@ import { Button }   from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import ImageUploadParser from "@/components/orders/ImageUploadParser";
+import type { ParsedOrder } from "@/lib/ai";
 
 /* ─── Types ─── */
 interface Category { id: string; name: string }
@@ -136,6 +138,13 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
   const [origFormulaSpecParams, setOrigFormulaSpecParams] = useState("");
   const [origFormulaMaterials,  setOrigFormulaMaterials]  = useState("");
 
+  /* ── Dialog: new customer ── */
+  const [newCustomerOpen,    setNewCustomerOpen]    = useState(false);
+  const [newCustomerCompany, setNewCustomerCompany] = useState("");
+  const [newCustomerContact, setNewCustomerContact] = useState("");
+  const [newCustomerSaving,  setNewCustomerSaving]  = useState(false);
+  const [newCustomerError,   setNewCustomerError]   = useState("");
+
   /* ── Dialog: new product ── */
   const [newProductOpen,       setNewProductOpen]       = useState(false);
   const [newProductName,       setNewProductName]       = useState("");
@@ -260,6 +269,26 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
     setSaveFormulaName("");
   }
 
+  /* ─── Create new customer (via dialog) ─── */
+  async function handleCreateCustomer() {
+    if (!newCustomerCompany.trim()) { setNewCustomerError("请填写公司名称"); return; }
+    if (!newCustomerContact.trim()) { setNewCustomerError("请填写联系人姓名"); return; }
+    setNewCustomerSaving(true); setNewCustomerError("");
+    const res = await fetch("/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company: newCustomerCompany.trim(), contact: newCustomerContact.trim() }),
+    });
+    setNewCustomerSaving(false);
+    if (!res.ok) { setNewCustomerError((await res.json()).error ?? "创建失败"); return; }
+    const created: Customer = await res.json();
+    setCustomers((prev) => [...prev, created].sort((a, b) => a.company.localeCompare(b.company)));
+    setForm((f) => ({ ...f, customerId: created.id }));
+    setNewCustomerOpen(false);
+    setNewCustomerCompany("");
+    setNewCustomerContact("");
+  }
+
   /* ─── Create new product (via dialog) ─── */
   async function handleCreateProduct() {
     if (!newProductName.trim())       { setNewProductError("请填写产品名称"); return; }
@@ -332,6 +361,76 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
     }
   }
 
+  /* ─── Handle image parsed result ─── */
+  const [parseNotice, setParseNotice] = useState("");
+
+  function handleImageParsed(result: ParsedOrder) {
+    const filled: string[] = [];
+    const warnings: string[] = [];
+
+    setForm((prev) => {
+      const next = { ...prev };
+
+      // Customer
+      if (result.customer) {
+        const matched = customers.find((c) =>
+          c.company.includes(result.customer!) || result.customer!.includes(c.company)
+        );
+        if (matched) {
+          next.customerId = matched.id;
+          filled.push("客户");
+        } else {
+          warnings.push(`识别到客户「${result.customer}」但系统中不存在，建议先新建客户`);
+        }
+      } else {
+        warnings.push("未识别到客户，建议新建客户或手动选择");
+      }
+
+      // Product
+      if (result.product) {
+        const matched = products.find((p) =>
+          p.name.includes(result.product!) ||
+          result.product!.includes(p.name) ||
+          p.category.name.includes(result.product!) ||
+          result.product!.includes(p.category.name)
+        );
+        if (matched) {
+          next.productId = matched.id;
+          next.formulaId = "";
+          next.formulaMaterials = "";
+          filled.push("产品");
+        } else {
+          warnings.push(`识别到产品「${result.product}」但系统中不存在，建议先新建产品`);
+        }
+      } else {
+        warnings.push("未识别到产品，建议新建产品或手动选择");
+      }
+
+      // Spec params
+      if (result.specParams && Object.keys(result.specParams).length > 0) {
+        next.specParams = Object.entries(result.specParams).map(([key, value]) => ({ key, value }));
+        filled.push("规格参数");
+      }
+
+      // Quantity & unit
+      if (result.quantity !== null) {
+        next.quantity = String(result.quantity);
+        filled.push("数量");
+      }
+      if (result.unit !== null) next.unit = result.unit;
+
+      // Extra notes
+      if (result.extraNotes) next.extraNotes = result.extraNotes;
+
+      return next;
+    });
+
+    const parts: string[] = [];
+    if (filled.length > 0) parts.push(`已填入：${filled.join("、")}`);
+    if (warnings.length > 0) parts.push(...warnings);
+    setParseNotice(parts.join("\n"));
+  }
+
   const selectedProduct    = products.find((p) => p.id === form.productId);
   const selectedCategoryId = selectedProduct?.categoryId;
   const filteredFormulas   = formulas.filter((f) => {
@@ -348,6 +447,19 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-5">
 
+      {/* ── 截图识别 ── */}
+      <ImageUploadParser onParsed={handleImageParsed} />
+
+      {parseNotice && (
+        <div className="text-sm bg-blue-50 border border-blue-100 rounded-md px-4 py-3 space-y-1">
+          {parseNotice.split("\n").map((line, i) => (
+            <p key={i} className={line.startsWith("已填入") ? "text-blue-700" : "text-amber-600"}>
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* ── Section 1: 基本信息 ── */}
       <Section title="基本信息">
         <div className="grid grid-cols-2 gap-5">
@@ -355,14 +467,26 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
           {/* 客户 */}
           <div className="space-y-1.5">
             <Label className="text-slate-700 text-sm font-medium">客户 <span className="text-red-400">*</span></Label>
-            <select
-              value={form.customerId}
-              onChange={(e) => set("customerId", e.target.value)}
-              className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            >
-              <option value="">请选择客户</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={form.customerId}
+                onChange={(e) => set("customerId", e.target.value)}
+                className="flex-1 min-w-0 h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option value="">请选择客户</option>
+                {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => { setNewCustomerOpen(true); setNewCustomerError(""); }}
+                title="新建客户"
+                className="h-9 w-9 shrink-0 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* 产品 + 新建按钮 */}
@@ -565,6 +689,44 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
           {saving ? "保存中…" : isEdit ? "保存修改" : "创建订单"}
         </Button>
       </div>
+
+      {/* ── Dialog: 新建客户 ── */}
+      <Dialog open={newCustomerOpen} onOpenChange={(o) => !o && setNewCustomerOpen(false)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle className="text-slate-800">新建客户</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-slate-700 text-sm font-medium">公司名称 <span className="text-red-400">*</span></Label>
+              <Input
+                value={newCustomerCompany}
+                onChange={(e) => setNewCustomerCompany(e.target.value)}
+                placeholder="如：华兴包装"
+                className="border-slate-200 focus:border-blue-400 focus:ring-blue-400"
+                onKeyDown={(e) => e.key === "Enter" && handleCreateCustomer()}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-700 text-sm font-medium">联系人姓名 <span className="text-red-400">*</span></Label>
+              <Input
+                value={newCustomerContact}
+                onChange={(e) => setNewCustomerContact(e.target.value)}
+                placeholder="如：张三"
+                className="border-slate-200 focus:border-blue-400 focus:ring-blue-400"
+                onKeyDown={(e) => e.key === "Enter" && handleCreateCustomer()}
+              />
+            </div>
+            {newCustomerError && (
+              <p className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">{newCustomerError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewCustomerOpen(false)} className="border-slate-200 text-slate-600">取消</Button>
+            <Button onClick={handleCreateCustomer} disabled={newCustomerSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {newCustomerSaving ? "创建中…" : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Dialog: 新建产品 ── */}
       <Dialog open={newProductOpen} onOpenChange={(o) => !o && setNewProductOpen(false)}>
