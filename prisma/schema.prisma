@@ -133,3 +133,23 @@ enum TaskStatus {
   PRODUCING
   DONE
 }
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  title     String        // 创建时间，如 "2026-05-21 14:30"
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id         String       @id @default(cuid())
+  sessionId  String?
+  session    ChatSession? @relation(fields: [sessionId], references: [id], map: "ChatMessage_sessionId_fkey")
+  role       String       // "user" | "assistant" | "tool"
+  content    String?      @db.Text
+  toolCalls  String?      @db.Text
+  toolCallId String?
+  toolName   String?
+  isPending  Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+}
