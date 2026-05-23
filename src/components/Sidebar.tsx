@@ -46,47 +46,62 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-16 flex flex-col items-center py-4 gap-2 bg-white border-r border-slate-200 z-50">
-      {/* Logo */}
-      <div className="w-10 h-10 rounded-xl bg-[#C8331F] flex items-center justify-center mb-4 shrink-0 shadow-sm shadow-red-200">
-        {/*
-          "7 I L" — three slanted geometric glyphs, all skewed forward like italic.
-          "7": top crossbar + right descending stroke
-          "I": single vertical bar
-          "L": vertical + bottom foot going right
-        */}
-        <svg viewBox="-4 -1 40 21" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-[15px]">
-          <g transform="skewX(-12)" fill="white">
-            {/* "7" — top bar + vertical on right */}
-            <path d="M 2,0 L 14,0 L 14,19 L 9,19 L 9,4 L 2,4 Z"/>
-            {/* "I" — single bar */}
-            <rect x="17" y="0" width="5" height="19"/>
-            {/* "L" — vertical + bottom foot */}
-            <path d="M 23,0 L 28,0 L 28,14 L 32,14 L 32,19 L 23,19 Z"/>
-          </g>
-        </svg>
-      </div>
+    <>
+      {/* 桌面端：左侧竖向导航栏 */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-full w-16 flex-col items-center py-4 gap-2 bg-white border-r border-slate-200 z-50">
+        {/* Logo */}
+        <div className="w-10 h-10 rounded-xl bg-[#C8331F] flex items-center justify-center mb-4 shrink-0 shadow-sm shadow-red-200">
+          <svg viewBox="-4 -1 40 21" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-[15px]">
+            <g transform="skewX(-12)" fill="white">
+              <path d="M 2,0 L 14,0 L 14,19 L 9,19 L 9,4 L 2,4 Z"/>
+              <rect x="17" y="0" width="5" height="19"/>
+              <path d="M 23,0 L 28,0 L 28,14 L 32,14 L 32,19 L 23,19 Z"/>
+            </g>
+          </svg>
+        </div>
+        <nav className="flex flex-col items-center gap-1 w-full px-2">
+          {navItems.map((item) => {
+            const active = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={`w-full flex items-center justify-center h-10 rounded-xl transition-colors ${
+                  active
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                {item.icon}
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
 
-      {/* Nav items */}
-      <nav className="flex flex-col items-center gap-1 w-full px-2">
-        {navItems.map((item) => {
-          const active = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              className={`w-full flex items-center justify-center h-10 rounded-xl transition-colors ${
-                active
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              {item.icon}
-            </Link>
-          );
-        })}
+      {/* 手机端：底部导航栏 */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-stretch h-16">
+          {navItems.map((item) => {
+            const active = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  active ? "text-blue-600" : "text-slate-400"
+                }`}
+              >
+                {item.icon}
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
-    </aside>
+    </>
   );
 }

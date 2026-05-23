@@ -171,19 +171,55 @@ export default function OrdersPage() {
     <>
       {/* Sticky header */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-        <div className="px-8 flex items-center h-14 gap-6">
-          <h1 className="text-base font-semibold text-slate-800 shrink-0">订单管理</h1>
+        {/* 手机端：两行布局 */}
+        <div className="md:hidden">
+          <div className="px-4 flex items-center justify-between h-14">
+            <h1 className="text-base font-semibold text-slate-800">订单管理</h1>
+            <button
+              onClick={() => router.push("/orders/new")}
+              className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-all shadow-sm shadow-blue-200"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              新建订单
+            </button>
+          </div>
+          <nav className="flex items-center border-t border-slate-100 px-2 overflow-x-auto">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className={`relative flex-shrink-0 h-10 px-4 text-sm font-medium transition-colors ${
+                  filter === tab.key ? "text-blue-600" : "text-slate-500"
+                }`}
+              >
+                {tab.label}
+                {counts[tab.key] > 0 && (
+                  <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    filter === tab.key ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                )}
+                {filter === tab.key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-          {/* Status filter tabs */}
+        {/* 桌面端：单行布局 */}
+        <div className="hidden md:flex px-8 items-center h-14 gap-6">
+          <h1 className="text-base font-semibold text-slate-800 shrink-0">订单管理</h1>
           <nav className="flex items-center h-14 gap-1 flex-1">
             {FILTER_TABS.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
                 className={`relative h-full px-4 text-sm font-medium transition-colors ${
-                  filter === tab.key
-                    ? "text-blue-600"
-                    : "text-slate-500 hover:text-slate-800"
+                  filter === tab.key ? "text-blue-600" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 {tab.label}
@@ -200,7 +236,6 @@ export default function OrdersPage() {
               </button>
             ))}
           </nav>
-
           <button
             onClick={() => router.push("/orders/new")}
             className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm shadow-blue-200 shrink-0"
@@ -214,11 +249,11 @@ export default function OrdersPage() {
       </header>
 
       {/* Filter bar */}
-      <div className="bg-white border-b border-slate-100 px-8 py-2.5 flex items-center gap-3 flex-wrap">
+      <div className="bg-white border-b border-slate-100 px-4 md:px-8 py-2.5 flex items-center gap-2 md:gap-3 overflow-x-auto">
         <select
           value={filterCustomer}
           onChange={(e) => setFilterCustomer(e.target.value)}
-          className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="h-8 flex-shrink-0 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
         >
           <option value="">全部客户</option>
           {uniqueCustomers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
@@ -226,12 +261,12 @@ export default function OrdersPage() {
         <select
           value={filterProduct}
           onChange={(e) => setFilterProduct(e.target.value)}
-          className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="h-8 flex-shrink-0 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
         >
           <option value="">全部产品</option>
           {uniqueProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <div className="flex items-center gap-1.5">
+        <div className="hidden md:flex items-center gap-1.5">
           <span className="text-xs text-slate-400 shrink-0">日期</span>
           <input
             type="date"
@@ -250,25 +285,77 @@ export default function OrdersPage() {
         {hasExtraFilter && (
           <button
             onClick={clearExtraFilters}
-            className="h-8 px-2.5 rounded-md text-xs text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 transition-colors"
+            className="h-8 flex-shrink-0 px-2.5 rounded-md text-xs text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 transition-colors"
           >
             清除筛选
           </button>
         )}
       </div>
 
-      <main className="flex-1 px-8 py-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="py-16 text-center text-sm text-slate-400">加载中…</div>
-          ) : displayed.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-slate-400 text-sm">
-                {filter === "ALL" ? "暂无订单" : `暂无「${STATUS_LABEL[filter as OrderStatus]}」订单`}
-              </p>
+      <main className="flex-1 px-4 md:px-8 py-4 md:py-6">
+        {loading ? (
+          <div className="py-16 text-center text-sm text-slate-400">加载中…</div>
+        ) : displayed.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-slate-400 text-sm">
+              {filter === "ALL" ? "暂无订单" : `暂无「${STATUS_LABEL[filter as OrderStatus]}」订单`}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* 手机端：卡片列表 */}
+            <div className="md:hidden space-y-3">
+              {displayed.map((order) => {
+                let specObj: Record<string, string> = {};
+                try { specObj = JSON.parse(order.specParams); } catch { /* empty */ }
+                const specEntries = Object.entries(specObj);
+                return (
+                  <div
+                    key={order.id}
+                    onClick={() => openDetail(order)}
+                    className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3.5 cursor-pointer active:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="font-mono text-xs text-slate-500">
+                        <span className="text-slate-300">ORD-</span>
+                        <span className="text-slate-700 font-semibold">{order.orderNo.replace("ORD-", "")}</span>
+                      </span>
+                      <button
+                        onClick={(e) => cycleStatus(order, e)}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${STATUS_STYLE[order.status]}`}
+                      >
+                        {STATUS_LABEL[order.status]}
+                      </button>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-slate-400 leading-tight">{order.product.category.name}</p>
+                        <p className="text-sm font-semibold text-slate-800 truncate">{order.product.name}</p>
+                      </div>
+                      <span className="text-sm font-medium text-slate-700 flex-shrink-0">
+                        {order.quantity}<span className="text-xs text-slate-400 ml-0.5">{order.unit}</span>
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-sm text-slate-600">{order.customer.company}</span>
+                      {specEntries.length > 0 && (
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {specEntries.slice(0, 3).map(([k, v]) => (
+                            <span key={k} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-xs whitespace-nowrap">
+                              {k}·{v}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="text-xs text-slate-400 text-center pt-1">显示 {displayed.length} / {orders.length} 个订单</p>
             </div>
-          ) : (
-            <>
+
+            {/* 桌面端：表格 */}
+            <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <table className="w-full text-sm table-fixed">
                 <colgroup>
                   <col className="w-44" />
@@ -298,30 +385,19 @@ export default function OrdersPage() {
                         onClick={() => openDetail(order)}
                         className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
                       >
-                        {/* 订单号 */}
                         <td className="px-5 py-4">
                           <span className="font-mono text-xs">
                             <span className="text-slate-400">ORD-</span>
                             <span className="text-slate-800 font-semibold">{order.orderNo.replace("ORD-", "")}</span>
                           </span>
                         </td>
-
-                        {/* 客户 */}
                         <td className="px-5 py-4">
                           <span className="text-slate-700 font-medium truncate block">{order.customer.company}</span>
                         </td>
-
-                        {/* 产品 */}
                         <td className="px-5 py-4">
-                          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight truncate">
-                            {order.product.category.name}
-                          </p>
-                          <p className="text-sm font-medium text-slate-800 mt-0.5 truncate">
-                            {order.product.name}
-                          </p>
+                          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide leading-tight truncate">{order.product.category.name}</p>
+                          <p className="text-sm font-medium text-slate-800 mt-0.5 truncate">{order.product.name}</p>
                         </td>
-
-                        {/* 规格参数 */}
                         <td className="px-5 py-4">
                           {specEntries.length === 0 ? (
                             <span className="text-slate-300">—</span>
@@ -337,14 +413,10 @@ export default function OrdersPage() {
                             </div>
                           )}
                         </td>
-
-                        {/* 数量 */}
                         <td className="px-5 py-4">
                           <span className="text-slate-700 font-medium">{order.quantity}</span>
                           <span className="text-slate-400 text-xs ml-1">{order.unit}</span>
                         </td>
-
-                        {/* 状态 badge — 点击循环切换 */}
                         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={(e) => cycleStatus(order, e)}
@@ -353,8 +425,6 @@ export default function OrdersPage() {
                             {STATUS_LABEL[order.status]}
                           </button>
                         </td>
-
-                        {/* 操作 */}
                         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
@@ -384,9 +454,9 @@ export default function OrdersPage() {
               <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100">
                 <span className="text-xs text-slate-400">显示 {displayed.length} / {orders.length} 个订单</span>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </main>
 
       {/* 订单详情 */}
